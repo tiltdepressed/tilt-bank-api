@@ -8,12 +8,14 @@ import (
 	"bank/internal/models"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type UserRepository interface {
 	CreateUser(ctx context.Context, user models.User) (string, error)
 	GetUserByID(ctx context.Context, id string) (models.User, error)
+	GetUserByUsername(ctx context.Context, username string) (models.User, error)
 	GetAllUsers(ctx context.Context) ([]models.User, error)
 	UpdateUser(ctx context.Context, user models.User) error
 	DeleteUser(ctx context.Context, id string) error
@@ -35,6 +37,10 @@ func (r *userRepo) CreateUser(ctx context.Context, user models.User) (string, er
 	var newID string
 	err := r.db.QueryRow(ctx, q, user.Username, user.PasswordHash).Scan(&newID)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return "", fmt.Errorf("username already taken")
+		}
 		return "", err
 	}
 
@@ -49,6 +55,23 @@ func (r *userRepo) GetUserByID(ctx context.Context, id string) (models.User, err
 
 	var u models.User
 	err := r.db.QueryRow(ctx, q, id).Scan(&u.ID, &u.Username, &u.PasswordHash)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return models.User{}, fmt.Errorf("user not found")
+		}
+		return models.User{}, err
+	}
+	return u, nil
+}
+
+func (r *userRepo) GetUserByUsername(ctx context.Context, username string) (models.User, error) {
+	q := `
+        SELECT id, username, password_hash
+        FROM users
+        WHERE username = $1`
+
+	var u models.User
+	err := r.db.QueryRow(ctx, q, username).Scan(&u.ID, &u.Username, &u.PasswordHash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return models.User{}, fmt.Errorf("user not found")

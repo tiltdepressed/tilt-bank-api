@@ -16,7 +16,7 @@ type TransactionRepository interface {
 	CreateTransaction(ctx context.Context, transaction models.Transaction) (string, error)
 	GetTransactionByID(ctx context.Context, id string) (models.Transaction, error)
 	GetTransactionsByAccountID(ctx context.Context, accountID string, limit, offset int) ([]models.Transaction, error)
-	UpdateTransactionStatus(ctx context.Context, id string, status string) error
+	UpdateTransactionStatus(ctx context.Context, id string, status models.TransactionStatus) error
 }
 
 type transactionRepo struct {
@@ -96,7 +96,7 @@ func (r *transactionRepo) GetTransactionsByAccountID(ctx context.Context, accoun
 	return txs, nil
 }
 
-func (r *transactionRepo) UpdateTransactionStatus(ctx context.Context, id string, status string) error {
+func (r *transactionRepo) UpdateTransactionStatus(ctx context.Context, id string, status models.TransactionStatus) error {
 	q := `
     UPDATE
     SET status = $2
